@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple Chess Game</title>
+    <style>
+        body {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;  /* Ensure full screen height is used */
+    margin: 0;
+    background-color: #f4f4f4;
+}
+
+.board {
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);  /* Use flexible fractional units */
+    grid-template-rows: repeat(8, 1fr);
+    gap: 2px;
+    width: 100%;  /* Allow the width and height to be set by JavaScript */
+    height: 100%;  /* Allow the height to be set by JavaScript */
+}
+
+.square {
+    background-color: #b58863;
+    width: 100%;  /* Make the square's size fully responsive */
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+.selected{
+    border: 2px solid blue;
+}
+        .square:nth-child(16n-4) {
+            background-color: #f0d9b5;
+        }
+        .square:nth-child(16n-2) {
+            background-color: #f0d9b5;
+        }
+        .square:nth-child(16n) {
+            background-color: #f0d9b5;
+        }
+        .square:nth-child(16n+1) {
+            background-color: #f0d9b5;
+        }
+        .square:nth-child(16n-6) {
+            background-color: #f0d9b5;
+        }
+        .square:nth-child(16n+3) {
+            background-color: #f0d9b5;
+        }
+        .square:nth-child(16n+5) {
+            background-color: #f0d9b5;
+        }
+        .square:nth-child(16n+7) {
+            background-color: #f0d9b5;
+        }
+        img {
+            width: 100%;
+            height: 100%;
+        }
+    </style>
+</head>
+<body>
+    <div class="board" id="chessboard"></div>
+
+    <script>
+        // Chess pieces assets
+        let selectedSquare = null;
+let board = [];
+const chessPieces = {
+    'K': 'chess-game/K.png',
+    'Q': 'chess-game/Q.png',
+    'R': 'chess-game/R.png',
+    'B': 'chess-game/B.png',
+    'N': 'chess-game/N.png',
+    'P': 'chess-game/P.png',
+    'k': 'chess-game/k1.png',
+    'q': 'chess-game/q1.png',
+    'r': 'chess-game/r1.png',
+    'b': 'chess-game/b1.png',
+    'n': 'chess-game/n1.png',
+    'p': 'chess-game/M.png',
+};
+
+const initialPosition = [
+    ['r', 'n', 'b', 'q', 'k', 'b', 'n', 'r'],
+    ['p', 'p', 'p', 'p', 'p', 'p', 'p', 'p'],
+    ['', '', '', '', '', '', '', ''],
+    ['', '', '', '', '', '', '', ''],
+    ['', '', '', '', '', '', '', ''],
+    ['', '', '', '', '', '', '', ''],
+    ['P', 'P', 'P', 'P', 'P', 'P', 'P', 'P'],
+    ['R', 'N', 'B', 'Q', 'K', 'B', 'N', 'R'],
+];
+
+const arrayFinalPos = [];
+
+// Function to update the board's current positions and DOM elements
+function updateBoard() {
+    const currentPosition = [];
+
+    // Iterate through the board array to capture the state
+    for (let i = 0; i < board.length; i++) {
+        const square = board[i];
+        
+        // Capture the current piece and its position
+        currentPosition.push({
+            img: square.img,  // The piece on the square
+            row: square.row, // Row index
+            col: square.col  // Column index
+        });
+
+        // Update the visual representation of the square
+        square.element.innerHTML = ''; // Clear current square's HTML
+        if (square.img) {
+            const imgElement = document.createElement('img');
+            imgElement.src = chessPieces[square.img]; // Set the image source
+            square.element.appendChild(imgElement); // Append the image to the square
+        }
+    }
+
+    // Push the current position to the final positions array
+    arrayFinalPos.push(currentPosition);
+}
+function createBoard() {
+    const chessboard = document.getElementById('chessboard');
+    for (let row = 0; row < 8; row++) {
+        for (let col = 0; col < 8; col++) {
+            const square = {
+                img: initialPosition[row][col],
+                row: row,
+                col: col,
+                captured: false,
+                promoted: false,
+                element: document.createElement('div')
+            };
+            square.element.classList.add('square');
+            if (square.img) {
+                const imgElement = document.createElement('img');
+                imgElement.src = chessPieces[square.img];
+                square.element.appendChild(imgElement);
+            }
+            square.element.addEventListener('click', () => handleSquareClick(square));
+            board.push(square);
+            chessboard.appendChild(square.element);
+        }
+    }
+}
+function handleSquareClick(square) {
+    // If a piece is already selected
+    if (selectedSquare) {
+        // Check if the move is valid
+        if (validMove(selectedSquare, square)) {
+            // Move the piece if valid
+            movePiece(selectedSquare, square);
+            
+            // Check for promotion
+            if ((selectedSquare.img === 'P' && square.row === 0) || (selectedSquare.img === 'p' && square.row === 7)) {
+                promotePawn(square);
+            }
+            selectedSquare = null; // Reset selected square for the next move
+
+            // After white's move, fetch AI's move for Black
+            sendFenToApi();
+        } else {
+            // If the move is invalid, allow selecting a new piece or deselecting
+            if (square.img === '') {
+                // Deselect if the new square is empty
+                console.log("Invalid move! Deselecting the piece.");
+                selectedSquare = null; // Reset selected square
+            } else if (square.img && square.img.toUpperCase() === square.img) {
+                // Select the new piece if it's a valid white piece
+                console.log("Invalid move! Selecting another piece.");
+                selectedSquare = square; // Change the selected square to the new piece
+            } else {
+                console.log("Invalid move! Cannot move to a square occupied by a black piece.");
+            }
+        }
+    } else if (square.img && square.img.toUpperCase() === square.img) {
+        // Select square if it contains a white piece (uppercase)
+        selectedSquare = square; // Set the selected square to the clicked square
+    }
+}
+
+
+
+function validMove(fromSquare, toSquare) {
+    const piece = fromSquare.img;
+    const fromRow = fromSquare.row;
+    const fromCol = fromSquare.col;
+    const toRow = toSquare.row;
+    const toCol = toSquare.col;
+
+    // Check if the target square has a piece of the same color
+    const targetPiece = toSquare.img;
+    const isSameColor = targetPiece && targetPiece.toUpperCase() === targetPiece;
+    // Prevent capturing own pieces
+    if (isSameColor) {
+        return false; // Cannot capture own piece
+    }
+
+    switch (piece) {
+        case 'P': // White Pawn
+            if (fromCol === toCol) {
+                // Regular move forward
+                if (fromRow - 1 === toRow && !toSquare.img) return true; // Move forward
+                // Double move from starting position
+                if (fromRow === 6 && fromRow - 2 === toRow && !toSquare.img) return true; // Double move from start
+            } else if (Math.abs(fromCol - toCol) === 1 && fromRow - 1 === toRow) {
+                // Capture move
+                if (targetPiece && targetPiece.toLowerCase() === targetPiece) {
+                    return true; // Capture a black piece
+                }
+            }
+            break;
+        case 'R': // Rook
+            if (fromRow === toRow || fromCol === toCol) {
+                return isPathClear(fromRow, fromCol, toRow, toCol);
+            }
+            break;
+        case 'N': // Knight
+            if ((Math.abs(fromRow - toRow) === 2 && Math.abs(fromCol - toCol) === 1) || (Math.abs(fromRow - toRow) === 1 && Math.abs(fromCol - toCol) === 2)) {
+                return true; // L-shaped move
+            }
+            break;
+        case 'B': // Bishop
+            if (Math.abs(fromRow - toRow) === Math.abs(fromCol - toCol)) {
+                return isPathClear(fromRow, fromCol, toRow, toCol);
+            }
+            break;
+        case 'Q': // Queen
+            if (fromRow === toRow || fromCol === toCol || Math.abs(fromRow - toRow) === Math.abs(fromCol - toCol)) {
+                return isPathClear(fromRow, fromCol, toRow, toCol);
+            }
+            break;
+        case 'K': // White King
+            if (Math.abs(fromRow - toRow) <= 1 && Math.abs(fromCol - toCol) <= 1) {
+                if (!isSameColor) return true; // Regular move or capture
+            }
+            // Castling
+            if (Math.abs(fromCol - toCol) === 2 && fromRow === toRow) {
+                // Check if there is a rook on the same row in the direction of the castling
+                const rookCol = toCol > fromCol ? 7 : 0; // Rook is at H or A
+                const rookSquare = board[fromRow * 8 + rookCol]; // H1 or A1
+
+                // Check if the rook is present and if the path is clear
+                if (rookSquare.img === 'R' && isPathClear(fromRow, fromCol, toRow, toCol)) {
+                    return true; // Castling
+                }
+            }
+            break;
+    }
+    
+    return false; // Invalid move
+}
+
+// Helper function to check if the path is clear for Rook, Bishop, and Queen moves
+function isPathClear(fromRow, fromCol, toRow, toCol) {
+    const rowDirection = toRow > fromRow ? 1 : toRow < fromRow ? -1 : 0;
+    const colDirection = toCol > fromCol ? 1 : toCol < fromCol ? -1 : 0;
+
+    let currentRow = fromRow + rowDirection;
+    let currentCol = fromCol + colDirection;
+
+    while (currentRow !== toRow || currentCol !== toCol) {
+        const currentSquare = board[currentRow * 8 + currentCol];
+        if (currentSquare.img) {
+            return false; // Path is blocked
+        }
+        currentRow += rowDirection;
+        currentCol += colDirection;
+    }
+    return true; // Path is clear
+}
+
+function movePiece(fromSquare, toSquare) {
+    if (fromSquare.img === 'K' && Math.abs(fromSquare.col - toSquare.col) === 2) { // Castling
+        // Short castling (King moves to G1)
+        if (toSquare.col === 6) {
+            // Move the king to G1
+            toSquare.img = 'K'; // Place king on the target square
+            fromSquare.img = ''; // Clear the original square
+
+            // Move the rook from H1 to F1
+            const rookSquare = board[fromSquare.row * 8 + 7]; // H1
+            const targetRookSquare = board[fromSquare.row * 8 + 5]; // F1
+            targetRookSquare.img = 'R'; // Place rook on the target square
+            rookSquare.img = ''; // Clear the original rook square
+        } 
+        // Long castling (King moves to C1)
+        else if (toSquare.col === 2) {
+            // Move the king to C1
+            toSquare.img = 'K'; // Place king on the target square
+            fromSquare.img = ''; // Clear the original square
+
+            // Move the rook from A1 to D1
+            const rookSquare = board[fromSquare.row * 8 + 0]; // A1
+            const targetRookSquare = board[fromSquare.row * 8 + 3]; // D1
+            targetRookSquare.img = 'R'; // Place rook on the target square
+            rookSquare.img = ''; // Clear the original rook square
+        }
+    } else {
+        // Regular piece movement
+        toSquare.img = fromSquare.img; // Update the target square's image
+        fromSquare.img = ''; // Clear the original square's image
+    }
+
+    // Clear the HTML content of both squares
+    toSquare.element.innerHTML = '';
+    fromSquare.element.innerHTML = '';
+
+    // Create and append the image element to the target square
+    if (toSquare.img) {
+        const imgElement = document.createElement('img');
+        imgElement.src = chessPieces[toSquare.img];
+        toSquare.element.appendChild(imgElement);
+    }
+    updateBoard();
+}
+
+
+function promotePawn(square) {
+    // Create a promotion selection dialog or logic
+    const promotionPiece = prompt("Promote pawn to (Q, R, B, N):").toUpperCase();
+    if (['Q', 'R', 'B', 'N'].includes(promotionPiece)) {
+        square.img = promotionPiece; // Update square image to the promoted piece
+        square.element.innerHTML = ''; // Clear the square HTML
+        const imgElement = document.createElement('img');
+        imgElement.src = chessPieces[promotionPiece]; // Update with new piece image
+        square.element.appendChild(imgElement); // Add new piece image to the square
+    }
+}
+
+
+
+    // Ensure that FEN is properly generated to reflect the correct side to move
+    function generateFen() {
+        let fen = '';
+        for (let row = 0; row < 8; row++) {
+            let emptyCount = 0;
+            for (let col = 0; col < 8; col++) {
+                const square = board.find(sq => sq.row === row && sq.col === col);
+                if (square.img === '') {
+                    emptyCount++;
+                } else {
+                    if (emptyCount > 0) {
+                        fen += emptyCount;
+                        emptyCount = 0;
+                    }
+                    fen += square.img;
+                }
+            }
+            if (emptyCount > 0) {
+                fen += emptyCount;
+            }
+            if (row < 7) {
+                fen += '/';
+            }
+        }
+        // Indicate it's Black's turn to move ('b')
+        fen += ' b KQkq - 0 1'; // Adjust FEN to reflect Black's turn after White's move
+        return fen;
+    }
+
+    // Send the FEN to the API to fetch the best move for Black
+    function sendFenToApi() {
+        const fen = generateFen();
+        fetch('http://127.0.0.1:5000/get_best_move', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ fen: fen }),
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.best_move) {
+                // Parse the AI move in UCI notation (e.g., e7e5)
+                const from = data.best_move.slice(0, 2);
+                const to = data.best_move.slice(2, 4);
+                const fromRow = 8 - parseInt(from[1]);
+                const fromCol = from.charCodeAt(0) - 97;
+                const toRow = 8 - parseInt(to[1]);
+                const toCol = to.charCodeAt(0) - 97;
+                // Calculate the difference in rows and columns
+
+                const fromSquare = board.find(sq => sq.row === fromRow && sq.col === fromCol);
+                const toSquare = board.find(sq => sq.row === toRow && sq.col === toCol);
+                // Only allow Black pieces to move in the AI response
+                if (fromSquare.img && fromSquare.img === fromSquare.img.toLowerCase()) {
+                    movePiece(fromSquare, toSquare);
+                    console.log(toSquare.img, fromCol , toCol)
+                    console.log(toSquare.img, fromRow , toRow)
+                    const rowDiff = Math.abs(toRow - fromRow);
+                    const colDiff = Math.abs(toCol - fromCol);
+                    console.log(colDiff)
+                    if ((toSquare.img === 'k') && (colDiff == 2)) {
+                        const rookCol = toCol > fromCol ? 7 : 0; // Rook is at H8 or A8
+                        const rookSquare = board[fromRow * 8 + rookCol]; // Reference to the rook's square                        
+                        const rookTargetCol = toCol > fromCol ? toCol - 1 : toCol + 1; // Position rook next to king
+                        movePiece(rookSquare, board[fromRow * 8 + rookTargetCol]);
+                        console.log(board)
+                    }
+                } else {
+                    console.error('AI tried to move a White piece. Ignoring.');
+                }
+            }
+        })
+        .catch(error => console.error('Error:', error));
+    }
+
+        // Initialize the board
+        createBoard();
+        // Function to resize the chessboard
+function resizeChessboard() {
+    // Get the chessboard element by its ID
+    const chessboard = document.getElementById("chessboard");
+
+    // Get the maximum width and height of the screen
+    const maxWidth = window.innerWidth;
+    const maxHeight = window.innerHeight;
+
+    // Calculate the smaller dimension to ensure the chessboard is square
+    let boardSize;
+
+    if (maxHeight > maxWidth) {
+        boardSize = maxWidth;  // Use max width if the height is larger
+    } else {
+        boardSize = maxHeight;  // Use max height if the width is larger
+    }
+
+    // Set the chessboard's width and height to the calculated size
+    chessboard.style.width = boardSize + "px";
+    chessboard.style.height = boardSize + "px";
+}
+
+// Call the resize function when the page loads
+resizeChessboard();
+
+// Add an event listener to resize the chessboard when the window size changes
+window.addEventListener('resize', resizeChessboard);
+
+    </script>
+</body>
+</html>
